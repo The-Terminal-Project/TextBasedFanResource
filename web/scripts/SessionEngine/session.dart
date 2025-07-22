@@ -1356,6 +1356,7 @@ class Session {
         }else if (!this.stats.doomedTimeline) {
             this.timeTillReckoning += -1;
             this.processScenes(this.players);
+            await SimController.instance.afterTick(this);
             SimController.instance.gatherStats(this);
             await window.requestAnimationFrame(tick);
         }

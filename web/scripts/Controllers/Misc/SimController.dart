@@ -201,4 +201,8 @@ abstract class SimController {
             statData.resetTurns();
         }
     }
+
+    /// Hook for controllers to run logic after each session tick.
+    /// Default implementation does nothing.
+    Future<void> afterTick(Session session) async {}
 }
