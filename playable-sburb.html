@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SBURB.PRIME - Playable Edition</title>
+    <style>
+        body { background: #000; color: #00ff00; font-family: monospace; padding: 20px; }
+        .choice-container { border: 2px solid #00ff00; margin: 15px 0; padding: 15px; border-radius: 8px; }
+        .choice-option { background: rgba(0,255,0,0.1); border: 1px solid #00aa00; color: #00ff00; padding: 12px; margin: 8px 0; cursor: pointer; display: block; width: 100%; text-align: left; }
+        .choice-option:hover { background: rgba(0,255,0,0.2); transform: translateX(5px); }
+        .narrator { color: #ff00ff; font-style: italic; margin: 10px 0; }
+        .player-choice { color: #ffff00; font-weight: bold; margin: 10px 0; padding: 8px; background: rgba(255,255,0,0.1); }
+        .narrative { color: #cccccc; margin: 8px 0; }
+        #terminal { height: 500px; overflow-y: auto; border: 2px solid #00ff00; padding: 15px; margin: 20px 0; }
+        #command-input { background: #000; color: #00ff00; border: 2px solid #00ff00; padding: 10px; width: 100%; font-size: 16px; }
+        .status { position: fixed; top: 10px; right: 10px; background: rgba(0,100,0,0.2); padding: 10px; border: 1px solid #00aa00; }
+        h1 { text-align: center; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
+    </style>
+</head>
+<body>
+    <h1>SBURB.PRIME - Playable Edition</h1>
+    <div class="status" id="status">
+        <div>Level: <span id="level">1</span></div>
+        <div>HP: <span id="hp">100</span>/<span id="maxhp">100</span></div>
+        <div>EXP: <span id="exp">0</span></div>
+    </div>
+    <div id="terminal"></div>
+    <input type="text" id="command-input" placeholder="Type 'help' for commands or 'begin' to start your cosmic journey...">
+    
+    <script>
+        let gameState = {
+            player: {
+                name: null,
+                classpect: null,
+                lunarSway: null,
+                level: 1,
+                hp: 100,
+                maxHp: 100,
+                experience: 0,
+                reputation: { consorts: 0, echoes: 0, denizen: 0 },
+                choiceHistory: [],
+                unlockedPaths: []
+            },
+            session: { active: false, id: null }
+        };
+
+        function addToTerminal(content) {
+            const terminal = document.getElementById('terminal');
+            terminal.innerHTML += content + '<br>';
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function updateStatus() {
+            document.getElementById('level').textContent = gameState.player.level;
+            document.getElementById('hp').textContent = gameState.player.hp;
+            document.getElementById('maxhp').textContent = gameState.player.maxHp;
+            document.getElementById('exp').textContent = gameState.player.experience;
+        }
+
+        class ChoiceSystem {
+            makeChoice(choiceId, optionIndex, option) {
+                gameState.player.choiceHistory.push({ choiceId, optionIndex, timestamp: Date.now() });
+                addToTerminal('<div class="player-choice">► You chose: ' + option.text + '</div>');
+                
+                if (option.consequences) {
+                    if (option.consequences.stats) {
+                        Object.entries(option.consequences.stats).forEach(([stat, change]) => {
+                            if (stat === 'hp') {
+                                gameState.player.hp = Math.max(0, Math.min(gameState.player.maxHp, gameState.player.hp + change));
+                            } else if (stat === 'maxHp') {
+                                gameState.player.maxHp += change;
+                            } else if (stat === 'experience') {
+                                gameState.player.experience += change;
+                                this.checkLevelUp();
+                            } else {
+                                gameState.player[stat] = (gameState.player[stat] || 0) + change;
+                            }
+                        });
+                    }
+                    
+                    if (option.consequences.reputation) {
+                        Object.entries(option.consequences.reputation).forEach(([faction, change]) => {
+                            gameState.player.reputation[faction] += change;
+                        });
+                    }
+                    
+                    if (option.consequences.unlocks) {
+                        option.consequences.unlocks.forEach(unlock => {
+                            if (!gameState.player.unlockedPaths.includes(unlock)) {
+                                gameState.player.unlockedPaths.push(unlock);
+                            }
+                        });
+                    }
+                }
+                
+                addToTerminal('<div class="narrative">' + (option.response || 'Your choice echoes through paradox space.') + '</div>');
+                
+                const commentaries = [
+                    "interesting choice there, player. let's see where this miracle leads us :o)",
+                    "that's one way to shake up the narrative, i respect that approach",
+                    "the honk of destiny approves of your decision making skills",
+                    "now that's what i call playing the game with style!",
+                    "every choice is a miracle in its own special way"
+                ];
+                addToTerminal('<div class="narrator">► GAMZEE H: ' + commentaries[Math.floor(Math.random() * commentaries.length)] + '</div>');
+                
+                updateStatus();
+                
+                if (option.followUp) {
+                    setTimeout(() => {
+                        if (option.followUp.type === 'choice') {
+                            this.presentChoice(option.followUp.choiceId, option.followUp.choiceData);
+                        } else if (option.followUp.type === 'narrative') {
+                            addToTerminal('<div class="narrative">' + option.followUp.text + '</div>');
+                        }
+                    }, option.followUp.delay || 2000);
+                }
+            }
+
+            checkLevelUp() {
+                const player = gameState.player;
+                const expNeeded = player.level * 100;
+                
+                if (player.experience >= expNeeded) {
+                    player.level++;
+                    player.experience -= expNeeded;
+                    player.maxHp += 10;
+                    player.hp = player.maxHp;
+                    addToTerminal('<div class="narrator" style="color: #ff00ff; font-weight: bold;">► GAMZEE H: well well well, looks like you\'ve grown stronger! welcome to level ' + player.level + '!</div>');
+                }
+            }
+
+            presentChoice(choiceId, choiceData) {
+                let html = '<div class="choice-container">';
+                html += '<h3 style="color: #00ff00; margin: 0 0 10px 0;">' + choiceData.title + '</h3>';
+                html += '<p style="color: #cccccc; margin: 0 0 15px 0;">' + choiceData.description + '</p>';
+                choiceData.options.forEach((option, index) => {
+                    const optionJson = JSON.stringify(option).replace(/"/g, '&quot;');
+                    html += '<button class="choice-option" onclick="choiceSystem.makeChoice(\'' + choiceId + '\', ' + index + ', ' + optionJson + ')">';
+                    html += '<span style="color: #ffff00; font-weight: bold;">' + (index + 1) + '.</span> ' + option.text;
+                    html += '</button>';
+                });
+                html += '</div>';
+                addToTerminal(html);
+            }
+
+            hasPlayerChosen(choiceId) {
+                return gameState.player.choiceHistory.some(choice => choice.choiceId === choiceId);
+            }
+        }
+
+        const choiceSystem = new ChoiceSystem();
+
+        const commands = {
+            help: () => {
+                addToTerminal('<div class="narrative">Available Commands:<br>• <strong>begin</strong> - Start your SBURB session<br>• <strong>name [name]</strong> - Set your player name<br>• <strong>classpect</strong> - Discover your classpect<br>• <strong>lunar</strong> - Determine your lunar sway<br>• <strong>explore</strong> - Explore your land<br>• <strong>status</strong> - Check your current status<br>• <strong>save</strong> - Save your game<br>• <strong>load</strong> - Load your game<br>• <strong>clear</strong> - Clear the terminal</div>');
+            },
+            
+            begin: () => {
+                if (gameState.session.active) {
+                    addToTerminal('<div class="narrator">► GAMZEE H: looks like you\'re already in a session, player. can\'t begin what\'s already begun :o)</div>');
+                    return;
+                }
+                
+                gameState.session.active = true;
+                gameState.session.id = Math.random().toString(36).substr(2, 9).toUpperCase();
+                
+                addToTerminal('<div class="narrator">► GAMZEE H: welcome to the grand performance! session ' + gameState.session.id + ' is now active</div>');
+                addToTerminal('<div class="narrative">The cosmic dance begins. Your journey through paradox space starts now...</div>');
+                
+                setTimeout(() => {
+                    choiceSystem.presentChoice('session_start', {
+                        title: "Your SBURB Session Begins",
+                        description: "The game disc spins up and reality begins to shift. How do you approach this cosmic game?",
+                        options: [
+                            {
+                                text: "Embrace the chaos and dive in headfirst",
+                                consequences: { stats: { experience: 10 }, reputation: { echoes: 1 }, unlocks: ["chaos_path"] },
+                                response: "You leap into the unknown with wild abandon. The game responds to your fearless energy."
+                            },
+                            {
+                                text: "Study the mechanics carefully before proceeding",
+                                consequences: { stats: { experience: 5 }, unlocks: ["knowledge_path"] },
+                                response: "Your methodical approach reveals hidden patterns in the game's structure."
+                            },
+                            {
+                                text: "Seek guidance from the echoes of past players",
+                                consequences: { reputation: { echoes: 2 }, unlocks: ["echo_path"] },
+                                response: "The whispers of previous players guide your first steps into the game."
+                            }
+                        ]
+                    });
+                }, 2000);
+            },
+
+            name: (args) => {
+                if (args.length === 0) {
+                    addToTerminal('<div class="narrative">Your name is: ' + (gameState.player.name || 'Unknown') + '</div>');
+                } else {
+                    gameState.player.name = args.join(' ');
+                    addToTerminal('<div class="narrator">► GAMZEE H: ' + gameState.player.name + ', what a miraculous name! it suits you perfectly</div>');
+                }
+            },
+
+            classpect: () => {
+                if (!gameState.player.classpect) {
+                    const classes = ['Bard', 'Knight', 'Rogue', 'Seer', 'Mage', 'Heir', 'Witch', 'Sylph', 'Prince', 'Thief', 'Maid', 'Page'];
+                    const aspects = ['Time', 'Space', 'Light', 'Void', 'Hope', 'Rage', 'Blood', 'Breath', 'Life', 'Doom', 'Heart', 'Mind'];
+                    
+                    const randomClass = classes[Math.floor(Math.random() * classes.length)];
+                    const randomAspect = aspects[Math.floor(Math.random() * aspects.length)];
+                    
+                    gameState.player.classpect = randomClass + ' of ' + randomAspect;
+                    
+                    addToTerminal('<div class="narrator">► GAMZEE H: the cosmos has spoken! you are the ' + gameState.player.classpect + '!</div>');
+                    addToTerminal('<div class="narrative">Your cosmic role is revealed. Power stirs within you as you embrace your destiny.</div>');
+                    
+                    if (!choiceSystem.hasPlayerChosen('classpect_awakening')) {
+                        setTimeout(() => {
+                            choiceSystem.presentChoice('classpect_awakening', {
+                                title: "Classpect Awakening",
+                                description: "Your " + gameState.player.classpect + " powers stir within you. How do you embrace your role?",
+                                options: [
+                                    {
+                                        text: "Embrace your powers fully",
+                                        consequences: { stats: { experience: 20, maxHp: 15 }, unlocks: ["power_awakened"] },
+                                        response: "Power surges through you as you fully accept your cosmic role."
+                                    },
+                                    {
+                                        text: "Approach your powers with caution",
+                                        consequences: { stats: { experience: 10, maxHp: 5 }, unlocks: ["careful_awakening"] },
+                                        response: "Your measured approach to power grants you control and wisdom."
+                                    },
+                                    {
+                                        text: "Seek to understand your role's deeper meaning",
+                                        consequences: { stats: { experience: 15 }, unlocks: ["deep_understanding"], reputation: { echoes: 2 } },
+                                        response: "Your quest for understanding reveals the true nature of your classpect."
+                                    }
+                                ]
+                            });
+                        }, 2000);
+                    }
+                } else {
+                    addToTerminal('<div class="narrative">You are the ' + gameState.player.classpect + '.</div>');
+                }
+            },
+
+            lunar: () => {
+                if (!gameState.player.lunarSway) {
+                    const sways = ['Prospit', 'Derse'];
+                    gameState.player.lunarSway = sways[Math.floor(Math.random() * sways.length)];
+                    
+                    const description = gameState.player.lunarSway === 'Prospit' 
+                        ? "You are a dreamer of the golden city, optimistic and creative."
+                        : "You are a dreamer of the purple moon, analytical and rebellious.";
+                    
+                    addToTerminal('<div class="narrator">► GAMZEE H: your dreams are tied to ' + gameState.player.lunarSway + '!</div>');
+                    addToTerminal('<div class="narrative">' + description + '</div>');
+                } else {
+                    addToTerminal('<div class="narrative">Your lunar sway is ' + gameState.player.lunarSway + '.</div>');
+                }
+            },
+
+            explore: () => {
+                if (!gameState.session.active) {
+                    addToTerminal('<div class="narrator">► GAMZEE H: you need to start a session before you can explore, player</div>');
+                    return;
+                }
+
+                addToTerminal('<div class="narrative">You venture forth to explore your land...</div>');
+                
+                const outcomes = [
+                    () => {
+                        addToTerminal('<div class="narrative">You discover ancient ruins covered in mysterious symbols.</div>');
+                        setTimeout(() => {
+                            choiceSystem.presentChoice('ancient_ruins_' + Date.now(), {
+                                title: "Ancient Ruins",
+                                description: "The ruins pulse with mysterious energy. What do you do?",
+                                options: [
+                                    {
+                                        text: "Study the symbols carefully",
+                                        consequences: { stats: { experience: 15 }, unlocks: ["ancient_knowledge"] },
+                                        response: "Hours of study reveal fragments of your land's ancient history."
+                                    },
+                                    {
+                                        text: "Search for hidden passages",
+                                        consequences: { stats: { experience: 12 }, unlocks: ["secret_passage"] },
+                                        response: "Your thorough search reveals a hidden chamber filled with artifacts."
+                                    }
+                                ]
+                            });
+                        }, 1500);
+                    },
+                    () => {
+                        addToTerminal('<div class="narrative">You encounter a group of friendly consorts!</div>');
+                        setTimeout(() => {
+                            choiceSystem.presentChoice('consort_encounter_' + Date.now(), {
+                                title: "Consort Encounter",
+                                description: "A group of friendly consorts approaches you with excited chirps.",
+                                options: [
+                                    {
+                                        text: "Try to communicate with them",
+                                        consequences: { reputation: { consorts: 2 }, stats: { experience: 10 } },
+                                        response: "The consorts share valuable information with you."
+                                    },
+                                    {
+                                        text: "Offer them a gift",
+                                        consequences: { reputation: { consorts: 3 }, stats: { experience: 5 } },
+                                        response: "Your generosity creates a strong bond with the consorts."
+                                    }
+                                ]
+                            });
+                        }, 1500);
+                    }
+                ];
+
+                setTimeout(outcomes[Math.floor(Math.random() * outcomes.length)], 1000);
+            },
+
+            status: () => {
+                const p = gameState.player;
+                addToTerminal('<div class="narrative"><strong>Player Status:</strong><br>' +
+                    '• Name: ' + (p.name || 'Unknown') + '<br>' +
+                    '• Classpect: ' + (p.classpect || 'Unawakened') + '<br>' +
+                    '• Lunar Sway: ' + (p.lunarSway || 'Undetermined') + '<br>' +
+                    '• Level: ' + p.level + '<br>' +
+                    '• HP: ' + p.hp + '/' + p.maxHp + '<br>' +
+                    '• Experience: ' + p.experience + '<br>' +
+                    '• Consort Rep: ' + p.reputation.consorts + '<br>' +
+                    '• Echo Rep: ' + p.reputation.echoes + '<br>' +
+                    '• Unlocked: ' + (p.unlockedPaths.length > 0 ? p.unlockedPaths.join(', ') : 'None') +
+                    '</div>');
+            },
+
+            save: () => {
+                localStorage.setItem('sburb_playable_save', JSON.stringify(gameState));
+                addToTerminal('<div class="narrator">► GAMZEE H: your progress has been saved!</div>');
+            },
+
+            load: () => {
+                const saved = localStorage.getItem('sburb_playable_save');
+                if (saved) {
+                    gameState = JSON.parse(saved);
+                    addToTerminal('<div class="narrator">► GAMZEE H: welcome back!</div>');
+                    updateStatus();
+                } else {
+                    addToTerminal('<div class="narrator">► GAMZEE H: no saved game found</div>');
+                }
+            },
+
+            clear: () => {
+                document.getElementById('terminal').innerHTML = '';
+            }
+        };
+
+        document.getElementById('command-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const input = this.value.trim();
+                if (input) {
+                    addToTerminal('<div style="color: #ffff00;">► ' + input + '</div>');
+                    const args = input.split(' ');
+                    const command = args.shift().toLowerCase();
+                    if (commands[command]) {
+                        commands[command](args);
+                    } else {
+                        addToTerminal('<div class="narrator">► GAMZEE H: unknown command! try "help"</div>');
+                    }
+                    this.value = '';
+                }
+            }
+        });
+
+        updateStatus();
+        addToTerminal('<div class="narrator">► GAMZEE H: welcome to SBURB.PRIME Playable Edition!</div>');
+        addToTerminal('<div class="narrator">► GAMZEE H: this version adapts to YOUR choices!</div>');
+        addToTerminal('<div class="narrative">Type <strong>"help"</strong> for commands or <strong>"begin"</strong> to start!</div>');
+    </script>
+</body>
+</html>

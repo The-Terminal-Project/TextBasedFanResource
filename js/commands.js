@@ -304,9 +304,15 @@ class CommandSystem {
         }
         
         const narrative = this.generateNarratorResponse(
-            'Session initiated! The cosmic dance begins. Your journey through paradox space starts now.',
+            'Session initiated! The cosmic dance begins. Your journey through paradox space starts now. But first, we need to see how you approach this cosmic game...',
             'session'
         );
+        
+        // Present the first major choice after a brief delay
+        setTimeout(() => {
+            const sessionChoice = choiceSystem.getChoiceTemplate('sessionStart');
+            choiceSystem.presentChoice('session_start', sessionChoice);
+        }, 2000);
         
         return this.createResponse(narrative, 'success');
     }
