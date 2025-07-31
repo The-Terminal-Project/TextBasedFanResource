@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBURB.PRIME - Terminal Simulation</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="terminal-header">
+            <div class="header-left">
+                <span class="logo">SBURB.PRIME</span>
+                <span class="version">v2.0.1</span>
+            </div>
+            <div class="header-right">
+                <span id="session-status">SESSION: INACTIVE</span>
+                <span id="echo-count">ECHOES: 0</span>
+            </div>
+        </header>
+
+        <!-- Main Container -->
+        <div class="main-container">
+            <!-- Left Panel - Terminal -->
+            <div class="terminal-panel">
+                <div class="terminal-header-bar">
+                    <span>TERMINAL - GAMZEE H (THE FIRST MATE)</span>
+                    <div class="terminal-controls">
+                        <button id="clear-terminal">CLEAR</button>
+                        <button id="save-session">SAVE</button>
+                        <button id="load-session">LOAD</button>
+                    </div>
+                </div>
+                <div id="terminal-output" class="terminal-output">
+                    <div class="startup-message">
+                        <pre>
+ ██████╗██████╗ ██╗   ██╗██████╗ ██████╗     ██████╗ ██████╗ ██╗███╗   ███╗███████╗
+██╔════╝██╔══██╗██║   ██║██╔══██╗██╔══██╗    ██╔══██╗██╔══██╗██║████╗ ████║██╔════╝
+███████╗██████╔╝██║   ██║██████╔╝██████╔╝    ██████╔╝██████╔╝██║██╔████╔██║█████╗  
+╚════██║██╔══██╗██║   ██║██╔══██╗██╔══██╗    ██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██╔══╝  
+███████║██████╔╝╚██████╔╝██║  ██║██████╔╝    ██║     ██║  ██║██║██║ ╚═╝ ██║███████╗
+╚══════╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝     ╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚══════╝
+                        </pre>
+                        <p class="narrator-text">
+                            > GAMZEE H: well well well, looks like we got ourselves another player ready to enter the game<br>
+                            > GAMZEE H: i'm your faithful first mate on this wild ride through paradox space<br>
+                            > GAMZEE H: type 'help' to see what miracles you can perform, or 'begin' to start your session<br>
+                            > GAMZEE H: remember, every command shapes your narrative thread in the grand tapestry<br>
+                        </p>
+                    </div>
+                </div>
+                <div class="terminal-input-container">
+                    <span class="prompt">></span>
+                    <input type="text" id="command-input" class="terminal-input" placeholder="Enter command..." autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Right Panel - Status & Info -->
+            <div class="info-panel">
+                <!-- Player Status -->
+                <div class="panel-section">
+                    <h3>PLAYER STATUS</h3>
+                    <div id="player-info">
+                        <p><strong>Name:</strong> <span id="player-name">Unknown</span></p>
+                        <p><strong>Classpect:</strong> <span id="player-classpect">Unawakened</span></p>
+                        <p><strong>Lunar Sway:</strong> <span id="player-lunar">Undetermined</span></p>
+                        <p><strong>HP:</strong> <span id="player-hp">100/100</span></p>
+                        <p><strong>Level:</strong> <span id="player-level">1</span></p>
+                    </div>
+                </div>
+
+                <!-- Current Land -->
+                <div class="panel-section">
+                    <h3>CURRENT LAND</h3>
+                    <div id="land-info">
+                        <p><strong>Name:</strong> <span id="land-name">None</span></p>
+                        <p><strong>Theme:</strong> <span id="land-theme">N/A</span></p>
+                        <p><strong>Consorts:</strong> <span id="land-consorts">None</span></p>
+                        <div id="land-map" class="ascii-map"></div>
+                    </div>
+                </div>
+
+                <!-- Active Echoes -->
+                <div class="panel-section">
+                    <h3>ACTIVE ECHOES</h3>
+                    <div id="echo-list">
+                        <p class="no-echoes">No active echoes</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="panel-section">
+                    <h3>QUICK ACTIONS</h3>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="executeCommand('inventory')">INVENTORY</button>
+                        <button class="action-btn" onclick="executeCommand('status')">STATUS</button>
+                        <button class="action-btn" onclick="executeCommand('look')">LOOK</button>
+                        <button class="action-btn" onclick="executeCommand('map')">MAP</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden Modals -->
+        <div id="echo-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>ECHO MANAGEMENT</h2>
+                <div id="echo-details"></div>
+                <button onclick="closeModal('echo-modal')">CLOSE</button>
+            </div>
+        </div>
+
+        <div id="book-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>THE BOOK OF NUMBERS</h2>
+                <div id="book-content"></div>
+                <button onclick="closeModal('book-modal')">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/core.js"></script>
+    <script src="js/markov.js"></script>
+    <script src="js/echo.js"></script>
+    <script src="js/land.js"></script>
+    <script src="js/strife.js"></script>
+    <script src="js/narrative.js"></script>
+    <script src="js/commands.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
